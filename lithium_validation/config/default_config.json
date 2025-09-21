@@ -1,0 +1,54 @@
+{
+  "validation": {
+    "confidence_threshold": 0.7,
+    "enable_factual_validation": true,
+    "enable_logical_consistency": true,
+    "enable_source_attribution": true,
+    "max_warnings": 10
+  },
+  "patterns": {
+    "factual_claims": [
+      "according to [^,]+,",
+      "studies show",
+      "research indicates",
+      "data suggests",
+      "statistics show",
+      "experts agree",
+      "it is known that",
+      "it has been proven"
+    ],
+    "uncertainty_indicators": [
+      "might be",
+      "could be",
+      "possibly",
+      "perhaps",
+      "it seems",
+      "appears to",
+      "may be",
+      "likely",
+      "probably",
+      "suggests that"
+    ],
+    "citation_patterns": [
+      "\\[[\\d\\w\\s,]+\\]",
+      "\\([^)]*20\\d{2}[^)]*\\)",
+      "source:",
+      "reference:",
+      "according to",
+      "as cited in",
+      "see also"
+    ]
+  },
+  "scoring": {
+    "factual_weight": 0.4,
+    "logical_weight": 0.3,
+    "source_weight": 0.3,
+    "uncertainty_bonus": 0.1,
+    "transition_bonus": 0.1
+  },
+  "mcp": {
+    "server_name": "lithium-validation",
+    "server_version": "1.0.0",
+    "max_batch_size": 100
+  }
+}
