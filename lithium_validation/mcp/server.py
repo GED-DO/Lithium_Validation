@@ -1,6 +1,7 @@
+#!/opt/homebrew/bin/python3.10
 """
 MCP (Model Context Protocol) server for Lithium-Validation framework.
-Provides validation services through MCP for Claude Desktop integration.
+Uses low-level MCP server API to avoid decorator issues.
 """
 
 import asyncio
@@ -9,9 +10,9 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime
 
 try:
-    from mcp.server import Server
-    from mcp.server.models import InitializationOptions
+    from mcp.server.lowlevel import Server
     from mcp.server.stdio import stdio_server
+    from mcp.server.models import InitializationOptions
     from mcp.types import (
         CallToolRequest,
         CallToolResult,
@@ -25,7 +26,14 @@ except ImportError:
     print("MCP not installed. Install with: pip install mcp")
     raise
 
-from ..core.validation_interface import ValidationInterface, ValidationResult
+try:
+    from ..core.validation_interface import ValidationInterface, ValidationResult
+except ImportError:
+    # Handle case when running as standalone script
+    import sys
+    import os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+    from lithium_validation.core.validation_interface import ValidationInterface, ValidationResult
 
 
 class LithiumMCPServer:
@@ -38,10 +46,9 @@ class LithiumMCPServer:
         self._setup_handlers()
     
     def _setup_handlers(self):
-        """Set up MCP request handlers."""
+        """Set up MCP request handlers using low-level API."""
         
-        @self.server.list_tools()
-        async def handle_list_tools() -> ListToolsResult:
+        async def handle_list_tools(request: ListToolsRequest) -> ListToolsResult:
             """List available validation tools."""
             return ListToolsResult(
                 tools=[
@@ -121,10 +128,12 @@ class LithiumMCPServer:
                 ]
             )
         
-        @self.server.call_tool()
-        async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
+        async def handle_call_tool(request: CallToolRequest) -> CallToolResult:
             """Handle tool calls."""
             try:
+                name = request.params.name
+                arguments = request.params.arguments or {}
+                
                 if name == "validate_output":
                     return await self._handle_validate_output(arguments)
                 elif name == "quick_check":
@@ -143,6 +152,10 @@ class LithiumMCPServer:
                     content=[TextContent(type="text", text=f"Error: {str(e)}")],
                     isError=True
                 )
+        
+        # Register handlers manually
+        self.server.request_handlers[ListToolsRequest] = handle_list_tools
+        self.server.request_handlers[CallToolRequest] = handle_call_tool
     
     async def _handle_validate_output(self, arguments: Dict[str, Any]) -> CallToolResult:
         """Handle validate_output tool call."""
@@ -273,7 +286,7 @@ class LithiumMCPServer:
                     server_name="lithium-validation",
                     server_version="1.0.0",
                     capabilities=self.server.get_capabilities(
-                        notification_options=None,
+                        notification_options=type('NotificationOptions', (), {'tools_changed': True})(),
                         experimental_capabilities={}
                     )
                 )
